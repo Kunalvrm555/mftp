@@ -2,6 +2,8 @@ from erp import req_args
 from os import environ as env
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 import smtplib as smtp
 from dotenv import load_dotenv
 load_dotenv()
@@ -13,7 +15,7 @@ def make_text(company):
     return text
 
 
-def send_email(subject, message):
+def send_email(subject, message, attachment_raw=None):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = env['SENDER_EMAIL']
@@ -26,6 +28,14 @@ def send_email(subject, message):
     </html>
     """
     msg.attach(MIMEText(html_message, 'html'))
+    
+    # Attach the file if given
+    if attachment_raw is not None:
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(attachment_raw)
+        encoders.encode_base64(part)
+        part.add_header('Content-Disposition', 'attachment', filename='attachment.pdf')
+        msg.attach(part)
 
     with smtp.SMTP_SSL('smtp.gmail.com', 465) as connection:
         connection.login(env['SENDER_EMAIL'], env['SENDER_PASSWORD'])
@@ -39,4 +49,5 @@ def notices_updated(notices):
         subject = 'Notice: %s - %s' % (notice['subject'], notice['company'])
         message = '<i>(%s)</i>: <p>%s</p><br/><hr/>' % (
             notice['time'], notice['text'])
-        send_email(subject, message)
+        attachment_raw = notice['attachment_raw'] if 'attachment_raw' in notice else None
+        send_email(subject, message, attachment_raw)
