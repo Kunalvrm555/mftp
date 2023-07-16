@@ -3,14 +3,10 @@ from pymongo import MongoClient
 from os import environ as env
 from sys import setrecursionlimit
 import re
-import hashlib
 from copy import copy as shallow_copy
-
-import settings
-
-from erp import tnp_login, req_args
+from erp import ERP_CDC_MODULE_URL, ERP_TPSTUDENT_URL, erp_login, req_args
+from main import session
 import hooks
-
 # Checking all the notices is ideal, but too slow to do quickly, since
 # we're fetching attachments. Instead, check enough notices that the
 # likelihood of missing an update is low.
@@ -23,31 +19,44 @@ setrecursionlimit(10000)
 
 mc = MongoClient(env['MONGODB_URI'])
 
-
 ERP_COMPANIES_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ERPMonitoring.htm?action=fetchData&jqqueryid=37&_search=false&nd=1448725351715&rows=20&page=1&sidx=&sord=asc&totalrows=50'
 ERP_NOTICEBOARD_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/Notice.jsp'
 ERP_NOTICES_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ERPMonitoring.htm?action=fetchData&jqqueryid=54&_search=false&nd=1448884994803&rows=20&page=1&sidx=&sord=asc&totalrows=50'
 ERP_ATTACHMENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/AdmFilePDF.htm?type=NOTICE&year={}&id={}'
 ERP_NOTICE_CONTENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ShowContent.jsp?year=%s&id=%s'
 
-
-@tnp_login
-def check_notices(session, sessionData):
+def check_notices(session):
+    erp_login(session)
+    
     r = session.get(ERP_NOTICEBOARD_URL, **req_args)
     r = session.get(ERP_NOTICES_URL, **req_args)
+    
+    ssoToken = env['ssoToken']
+    attachment_args = {
+    'timeout': 20,
+    'headers': {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) '
+                      'Chrome/46.0.2490.86 Safari/537.36',
+        'Referer':
+        'https://erp.iitkgp.ac.in/SSOAdministration/login.htm?sessionToken=595794DC220159D1CBD10DB69832EF7E.worker3',
+    },
+    'verify': False
+}
 
-    print("ERP and TNP login completed!")
+
+    print ("ERP and TNP login completed!")
 
     notices_list = bs(r.text, 'html.parser')
 
-    print("Total number of notices fetched: %d" % len(notices_list.find_all('row')))
+    print ("Total number of notices fetched: %d" % len(notices_list.find_all('row')))
 
     notices = []
     # Only check the first 50 notices
     for row in notices_list.find_all('row')[:NUM_NOTICES_DIFFED]:
         notice = {}
 
-        cds = [x for x in row.find_all(text=True) if isinstance(x, CData)]
+        cds = list(filter(lambda x: isinstance(x, CData), row.find_all(text=True)))
+        #print(cds)
 
         notice['subject'] = cds[2].string
         notice['company'] = cds[3].string
@@ -68,15 +77,13 @@ def check_notices(session, sessionData):
         a = bs(cds[7].string, 'html.parser').find_all('a')[0]
         if a.attrs['title'] == 'Download':
             notice['attachment_url'] = ERP_ATTACHMENT_URL.format(year, id_)
+            r = session.get(ERP_CDC_MODULE_URL, **req_args)
+            r = session.get(ERP_TPSTUDENT_URL, **req_args)
             r = session.get(notice['attachment_url'], stream=True)
-            r.raw.decode_content = True
-            hash_ = hashlib.md5()
-            notice['attachment_raw'] = b""
+            notice['attachment_raw'] = b''
             for chunk in r.iter_content(4096):
                 notice['attachment_raw'] += chunk
-                hash_.update(chunk)
-            notice['attachment_md5'] = hash_.hexdigest()
-            notice['uid'] += "_"+notice['attachment_md5']
+            # print("attachment_raw: %s" % len(notice['attachment_raw']))
 
         notices.append(notice)
 
@@ -87,7 +94,7 @@ def handle_notices_diff(notices):
     notices_coll = mc.get_default_database().notices
 
     different_notices = []
-    print('Checking ', len(notices), 'notices')
+    print ('Checking ', len(notices), 'notices')
     for notice in notices:
         sanitised_notice = sanitise_notice_for_database(notice)
         notice_cpy = shallow_copy(sanitised_notice)
@@ -101,12 +108,14 @@ def handle_notices_diff(notices):
             different_notices.append(notice)
 
 
-    print('Different notices: ', [sanitise_notice_for_database(notice) for notice in different_notices])
+    #print ('Different notices: ', [sanitise_notice_for_database(notice) for notice in different_notices])
     if len(different_notices) > 0:
         for notice in different_notices:
             sanitised_notice = sanitise_notice_for_database(notice)
             hooks.notices_updated([notice])
             notices_coll.insert_one(sanitised_notice)
+    else:
+        print("No New Notice found!")
 
 def sanitise_notice_for_database(notice):
     sanitised_notice = shallow_copy(notice)
