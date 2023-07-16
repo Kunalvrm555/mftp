@@ -3,3 +3,8 @@ env
 *.pyc
 .idea/
 .vscode/
+*.ipynb
+notices/
+.session_token
+*.json
+*.pdf
