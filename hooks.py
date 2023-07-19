@@ -21,7 +21,7 @@ def make_text(company):
 def send_email(subject, message, attachment_raw=None):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = env['SENDER_EMAIL']
+    msg['From'] = 'MFTP <' + env['SENDER_EMAIL'] + '>'
     msg['To'] = env['RECIPIENT_EMAIL']
     html_message = f"""
     <html>
@@ -42,7 +42,7 @@ def send_email(subject, message, attachment_raw=None):
 
     with smtp.SMTP_SSL('smtp.gmail.com', 465) as connection:
         connection.login(env['SENDER_EMAIL'], env['SENDER_PASSWORD'])
-        connection.sendmail(env['SENDER_EMAIL'],
+        connection.sendmail(msg['From'],
                             env['RECIPIENT_EMAIL'], msg.as_string())
     print("Email sent successfully")
 
