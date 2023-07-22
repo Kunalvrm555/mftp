@@ -15,6 +15,10 @@ requests.packages.urllib3.disable_warnings()
 ioloop = tornado.ioloop.IOLoop.current()
 UPDATE_PERIOD = 1000 * 60 * 1 # 1 minute
 
+headers = {
+    'timeout': '20',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/51.0.2704.79 Chrome/51.0.2704.79 Safari/537.36',
+}
 session = requests.Session()
 
 @gen.coroutine
@@ -22,14 +26,13 @@ def run_updates():
     def func():
         try:
             print ('Checking notices...')
-            update.check_notices(session)
+            update.check_notices(session, headers)
         except:
             print ("Unhandled error occured :\n{}".format(traceback.format_exc()))
 
     try:
         with ThreadPoolExecutor(max_workers=1) as executor:
-            yield gen.with_timeout(datetime.timedelta(UPDATE_PERIOD/1000.0),
-                                   executor.submit(func))
+            yield gen.with_timeout(datetime.timedelta(UPDATE_PERIOD/1000.0), executor.submit(func))
         now = dt.now() + timedelta(hours=5, minutes=30) # Add 5 hours and 30 minutes for GMT +05:30
         current_time = now.strftime("%H:%M:%S")
         print ('run_updates done, last --> t= ' + current_time)
@@ -45,11 +48,8 @@ class PingHandler(tornado.web.RequestHandler):
         return
 
 if __name__ == '__main__':
-    app = tornado.web.Application([
-        (r'/', PingHandler)
-    ])
+    app = tornado.web.Application([ (r'/', PingHandler) ])
     app.listen(os.environ['PORT'])
     run_updates()
-    tornado.ioloop.PeriodicCallback(run_updates,
-                                    UPDATE_PERIOD).start()
+    tornado.ioloop.PeriodicCallback(run_updates, UPDATE_PERIOD).start() 
     ioloop.start()

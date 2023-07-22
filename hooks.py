@@ -1,4 +1,3 @@
-from erp import req_args
 from os import environ as env
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText

@@ -4,8 +4,8 @@ from os import environ as env
 from sys import setrecursionlimit
 import re
 from copy import copy as shallow_copy
-from erp import ERP_CDC_MODULE_URL, ERP_TPSTUDENT_URL, erp_login, req_args
-from main import session
+import erpcreds
+import iitkgp_erp_login.erp as erp
 import hooks
 # Checking all the notices is ideal, but too slow to do quickly, since
 # we're fetching attachments. Instead, check enough notices that the
@@ -19,32 +19,30 @@ setrecursionlimit(10000)
 
 mc = MongoClient(env['MONGODB_URI'])
 
+ERP_CDC_MODULE_URL = 'https://erp.iitkgp.ac.in/IIT_ERP3/menulist.htm?module_id=26'
+ERP_TPSTUDENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/TPStudent.jsp'
 ERP_COMPANIES_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ERPMonitoring.htm?action=fetchData&jqqueryid=37&_search=false&nd=1448725351715&rows=20&page=1&sidx=&sord=asc&totalrows=50'
 ERP_NOTICEBOARD_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/Notice.jsp'
 ERP_NOTICES_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ERPMonitoring.htm?action=fetchData&jqqueryid=54&_search=false&nd=1448884994803&rows=20&page=1&sidx=&sord=asc&totalrows=50'
 ERP_ATTACHMENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/AdmFilePDF.htm?type=NOTICE&year={}&id={}'
 ERP_NOTICE_CONTENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ShowContent.jsp?year=%s&id=%s'
 
-def check_notices(session):
-    erp_login(session)
+def check_notices(session, headers):
+    _, ssoToken = erp.login(headers, session, ERPCREDS=erpcreds, OTP_CHECK_INTERVAL=2, LOGGING=True)
+    r = session.get(ERP_NOTICEBOARD_URL, headers=headers)
+    r = session.get(ERP_NOTICES_URL, headers=headers)
     
-    r = session.get(ERP_NOTICEBOARD_URL, **req_args)
-    r = session.get(ERP_NOTICES_URL, **req_args)
-    
-    ssoToken = env['ssoToken']
     attachment_args = {
-    'timeout': 20,
-    'headers': {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/46.0.2490.86 Safari/537.36',
-        'Referer':
-        'https://erp.iitkgp.ac.in/SSOAdministration/login.htm?sessionToken=595794DC220159D1CBD10DB69832EF7E.worker3',
-    },
-    'verify': False
-}
+        'timeout': 20,
+        'headers': {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_1) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/46.0.2490.86 Safari/537.36',
+            'Referer':
+            'https://erp.iitkgp.ac.in/SSOAdministration/login.htm?sessionToken=595794DC220159D1CBD10DB69832EF7E.worker3',
+        },
+        'verify': False
+    }
 
-
-    print ("ERP and TNP login completed!")
 
     notices_list = bs(r.text, 'html.parser')
 
@@ -77,8 +75,8 @@ def check_notices(session):
         a = bs(cds[7].string, 'html.parser').find_all('a')[0]
         if a.attrs['title'] == 'Download':
             notice['attachment_url'] = ERP_ATTACHMENT_URL.format(year, id_)
-            r = session.get(ERP_CDC_MODULE_URL, **req_args)
-            r = session.get(ERP_TPSTUDENT_URL, **req_args)
+            r = session.get(ERP_CDC_MODULE_URL, headers=headers)
+            r = session.get(ERP_TPSTUDENT_URL, headers=headers)
             r = session.get(notice['attachment_url'], stream=True)
             notice['attachment_raw'] = b''
             for chunk in r.iter_content(4096):
