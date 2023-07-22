@@ -28,7 +28,11 @@ ERP_ATTACHMENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/AdmFilePDF.h
 ERP_NOTICE_CONTENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ShowContent.jsp?year=%s&id=%s'
 
 def check_notices(session, headers):
-    sessionToken, ssoToken = erp.login(headers, session, ERPCREDS=erpcreds, OTP_CHECK_INTERVAL=2, LOGGING=True, SESSION_STORAGE_FILE='.session_token')
+    if not erp.session_alive(session):
+        _, ssoToken = erp.login(headers, session, ERPCREDS=erpcreds, OTP_CHECK_INTERVAL=2, LOGGING=True, SESSION_STORAGE_FILE='.session_token')
+    else:
+        print("[PREVIOUS SESSION STATUS] Alive!")
+        _, ssoToken = erp.get_tokens_from_file('.session_token')
     
     r = session.post(ERP_TPSTUDENT_URL, data=dict(ssoToken=ssoToken, menu_id=11, module_id=26), headers=headers)
     r = session.get(ERP_NOTICEBOARD_URL, headers=headers)
