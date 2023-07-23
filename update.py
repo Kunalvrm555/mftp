@@ -4,8 +4,6 @@ from os import environ as env
 from sys import setrecursionlimit
 import re
 from copy import copy as shallow_copy
-import erpcreds
-import iitkgp_erp_login.erp as erp
 import hooks
 # Checking all the notices is ideal, but too slow to do quickly, since
 # we're fetching attachments. Instead, check enough notices that the
@@ -27,13 +25,7 @@ ERP_NOTICES_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ERPMonitoring.h
 ERP_ATTACHMENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/AdmFilePDF.htm?type=NOTICE&year={}&id={}'
 ERP_NOTICE_CONTENT_URL = 'https://erp.iitkgp.ac.in/TrainingPlacementSSO/ShowContent.jsp?year=%s&id=%s'
 
-def check_notices(session, headers):
-    if not erp.session_alive(session):
-        _, ssoToken = erp.login(headers, session, ERPCREDS=erpcreds, OTP_CHECK_INTERVAL=2, LOGGING=True, SESSION_STORAGE_FILE='.session_token')
-    else:
-        print("[PREVIOUS SESSION STATUS] Alive!")
-        _, ssoToken = erp.get_tokens_from_file('.session_token')
-    
+def check_notices(session, headers, ssoToken):
     r = session.post(ERP_TPSTUDENT_URL, data=dict(ssoToken=ssoToken, menu_id=11, module_id=26), headers=headers)
     r = session.get(ERP_NOTICEBOARD_URL, headers=headers)
     r = session.get(ERP_NOTICES_URL, headers=headers)

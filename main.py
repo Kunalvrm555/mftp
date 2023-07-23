@@ -9,6 +9,8 @@ import requests
 import datetime
 import traceback
 from datetime import datetime as dt, timedelta
+import erpcreds
+import iitkgp_erp_login.erp as erp
 
 requests.packages.urllib3.disable_warnings()
 
@@ -25,8 +27,14 @@ session = requests.Session()
 def run_updates():
     def func():
         try:
-            print ('Checking notices...')
-            update.check_notices(session, headers)
+            print ('>> [LOGGING IN] <<')
+            if not erp.session_alive(session):
+                _, ssoToken = erp.login(headers, session, ERPCREDS=erpcreds, OTP_CHECK_INTERVAL=2, LOGGING=True, SESSION_STORAGE_FILE='.session_token')
+            else:
+                print("[PREVIOUS SESSION STATUS] >> Alive")
+                _, ssoToken = erp.get_tokens_from_file('.session_token')
+            print ('>> [CHECKING NOTICES] <<')
+            update.check_notices(session, headers, ssoToken)
         except:
             print ("Unhandled error occured :\n{}".format(traceback.format_exc()))
 
