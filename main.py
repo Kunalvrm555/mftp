@@ -27,11 +27,11 @@ session = requests.Session()
 def run_updates():
     def func():
         try:
-            print ('>> [LOGGING IN] <<')
             if not erp.session_alive(session):
+                print ('>> [LOGGING IN] <<')
                 _, ssoToken = erp.login(headers, session, ERPCREDS=erpcreds, OTP_CHECK_INTERVAL=2, LOGGING=True, SESSION_STORAGE_FILE='.session_token')
             else:
-                print("[PREVIOUS SESSION STATUS] >> Alive")
+                print(">> [PREVIOUS SESSION ALIVE] <<")
                 _, ssoToken = erp.get_tokens_from_file('.session_token')
             print ('>> [CHECKING NOTICES] <<')
             update.check_notices(session, headers, ssoToken)
