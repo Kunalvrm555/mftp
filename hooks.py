@@ -57,10 +57,20 @@ def send_email(subject, notice, attachment_raw=None):
                             env['RECIPIENT_EMAIL'], msg.as_string())
     print("Email sent successfully")
 
+def clean_links(text):
+    text = re.sub(r'-\s', '-', text)  # remove whitespace that follows a hyphen
+    url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+    urls = re.findall(url_pattern, text)
+    for url in urls:
+        clean_url = url.replace("\n", "")
+        text = text.replace(url, clean_url)
+    return text
+
 def send_whatsapp(notice):
-        notice['text'] = html2text(notice['text'])
-        subject = 'Notice: %s - %s' % (notice['subject'], notice['company'])
-        message = "*" + subject + "*" + "\n" + notice['text'] + "\n" + notice['time']
+        notice_text = html2text(notice['text'])
+        notice_text = clean_links(notice_text)
+        subject = '*Notice: %s - %s*\n' % (notice['subject'], notice['company'])
+        message = subject + "\n" + notice_text + "\n" + notice['time']
         if ('attachment_url') in notice:
             encoded_string = base64.b64encode(notice['attachment_raw'])
             try:
