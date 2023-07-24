@@ -6,6 +6,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import smtplib as smtp
 import base64
+import re
 from dotenv import load_dotenv
 import requests
 from html2text import html2text
@@ -18,15 +19,25 @@ def make_text(company):
     return text
 
 
-def send_email(subject, message, attachment_raw=None):
+def send_email(subject, notice, attachment_raw=None):
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
     msg['From'] = 'MFTP <' + env['SENDER_EMAIL'] + '>'
     msg['To'] = env['RECIPIENT_EMAIL']
+    # Identify the URLs and replace them with 'Click here'
+    notice_text = re.sub(r"(https?://[^\s]+)", r'<a href="\1">Click here</a>', notice['text'])
+
     html_message = f"""
     <html>
         <body>
-            <p>{message}</p>
+            <div style="font-family: Arial, sans-serif; width: 90%; margin: 0 auto; border: 1px solid #333; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);">
+                <div style="margin-bottom: 20px;">
+                    {notice_text}
+                </div>
+                <div style="text-align: right; font-style: italic;">
+                    ({notice['time']})
+                </div>
+            </div>
         </body>
     </html>
     """
@@ -69,8 +80,6 @@ def send_whatsapp(notice):
 def notices_updated(notices):
     for notice in reversed(notices):
         subject = 'Notice: %s - %s' % (notice['subject'], notice['company'])
-        message = '<i>(%s)</i>: <p>%s</p><br/><hr/>' % (
-            notice['time'], notice['text'])
         attachment_raw = notice['attachment_raw'] if 'attachment_raw' in notice else None
-        send_email(subject, message, attachment_raw)
+        send_email(subject, notice, attachment_raw)
         send_whatsapp(notice)
