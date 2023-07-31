@@ -9,6 +9,7 @@ import requests
 import datetime
 import traceback
 from datetime import datetime as dt, timedelta
+import time
 
 requests.packages.urllib3.disable_warnings()
 
@@ -21,6 +22,7 @@ session = requests.Session()
 def run_updates():
     def func():
         try:
+            time.sleep(10)  # Wait for 10 seconds before starting
             print ('Checking notices...')
             update.check_notices(session)
         except:
