@@ -89,6 +89,10 @@ def send_whatsapp(notice):
 
 def notices_updated(notices):
     for notice in reversed(notices):
+        # if notice['subject'] contains 'PPO', don't send it
+        if 'PPO' in notice['subject']:
+            print("PPO notice found, skipping")
+            continue
         subject = 'Notice: %s - %s' % (notice['subject'], notice['company'])
         attachment_raw = notice['attachment_raw'] if 'attachment_raw' in notice else None
         send_email(subject, notice, attachment_raw)
