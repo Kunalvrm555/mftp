@@ -1,3 +1,4 @@
+import time
 from bs4 import BeautifulSoup as bs, CData
 from pymongo import MongoClient
 from os import environ as env
@@ -75,15 +76,24 @@ def check_notices(session):
         notice['uid'] = id_ + "_" + year
 
         a = bs(cds[7].string, 'html.parser').find_all('a')[0]
-        if a.attrs['title'] == 'Download':
+        if a.attrs['title'] == 'Download' or re.search(r'pfa|document|attached', notice['text'], re.IGNORECASE):
             notice['attachment_url'] = ERP_ATTACHMENT_URL.format(year, id_)
-            r = session.get(ERP_CDC_MODULE_URL, **req_args)
-            r = session.get(ERP_TPSTUDENT_URL, **req_args)
-            r = session.get(notice['attachment_url'], stream=True)
-            notice['attachment_raw'] = b''
-            for chunk in r.iter_content(4096):
-                notice['attachment_raw'] += chunk
-            # print("attachment_raw: %s" % len(notice['attachment_raw']))
+            max_attempts = 3
+            for attempt in range(max_attempts):
+                try:
+                    r = session.get(ERP_CDC_MODULE_URL, **req_args)
+                    r = session.get(ERP_TPSTUDENT_URL, **req_args)
+                    r = session.get(notice['attachment_url'], stream=True)
+                    notice['attachment_raw'] = b''
+                    for chunk in r.iter_content(4096):
+                        notice['attachment_raw'] += chunk
+                    break
+                except Exception as e:
+                    if attempt < max_attempts - 1:
+                        print(f"Failed to fetch attachment on attempt {attempt+1}, retrying...")
+                        time.sleep(10)
+                    else:
+                        print(f"No attachment fetched after {attempt+1} attempts")
 
         notices.append(notice)
 
